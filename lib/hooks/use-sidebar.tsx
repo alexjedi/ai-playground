@@ -2,11 +2,14 @@
 
 import * as React from 'react'
 
-const LOCAL_STORAGE_KEY = 'sidebar'
+const LOCAL_STORAGE_KEY_CHATS = 'sidebar-chats'
+const LOCAL_STORAGE_KEY_PARAMS = 'sidebar-params'
 
 interface SidebarContext {
-  isSidebarOpen: boolean
-  toggleSidebar: () => void
+  isSidebarOpenChats: boolean
+  toggleSidebarChats: () => void
+  isSidebarOpenParams: boolean
+  toggleSidebarParams: () => void
   isLoading: boolean
 }
 
@@ -27,21 +30,34 @@ interface SidebarProviderProps {
 }
 
 export function SidebarProvider({ children }: SidebarProviderProps) {
-  const [isSidebarOpen, setSidebarOpen] = React.useState(true)
+  const [isSidebarOpenChats, setSidebarOpenChats] = React.useState(true)
+  const [isSidebarOpenParams, setSidebarOpenParams] = React.useState(true)
   const [isLoading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
-    const value = localStorage.getItem(LOCAL_STORAGE_KEY)
-    if (value) {
-      setSidebarOpen(JSON.parse(value))
+    const valueChats = localStorage.getItem(LOCAL_STORAGE_KEY_CHATS)
+    const valueParams = localStorage.getItem(LOCAL_STORAGE_KEY_PARAMS)
+    if (valueChats) {
+      setSidebarOpenChats(JSON.parse(valueChats))
+    }
+    if (valueParams) {
+      setSidebarOpenParams(JSON.parse(valueParams))
     }
     setLoading(false)
   }, [])
 
-  const toggleSidebar = () => {
-    setSidebarOpen(value => {
+  const toggleSidebarChats = () => {
+    setSidebarOpenChats(value => {
       const newState = !value
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newState))
+      localStorage.setItem(LOCAL_STORAGE_KEY_CHATS, JSON.stringify(newState))
+      return newState
+    })
+  }
+
+  const toggleSidebarParams = () => {
+    setSidebarOpenParams(value => {
+      const newState = !value
+      localStorage.setItem(LOCAL_STORAGE_KEY_PARAMS, JSON.stringify(newState))
       return newState
     })
   }
@@ -52,7 +68,13 @@ export function SidebarProvider({ children }: SidebarProviderProps) {
 
   return (
     <SidebarContext.Provider
-      value={{ isSidebarOpen, toggleSidebar, isLoading }}
+      value={{
+        isSidebarOpenChats,
+        isSidebarOpenParams,
+        toggleSidebarChats,
+        toggleSidebarParams,
+        isLoading
+      }}
     >
       {children}
     </SidebarContext.Provider>

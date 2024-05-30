@@ -9,18 +9,17 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { StreamableValue, useStreamableValue } from 'ai/rsc'
 import { useStreamableText } from '@/lib/hooks/use-streamable-text'
+import { BrainCog, UserRound } from 'lucide-react'
 
 // Different types of message bubbles.
 
 export function UserMessage({ children }: { children: React.ReactNode }) {
   return (
     <div className="group relative flex items-start md:-ml-12">
-      <div className="flex size-[25px] shrink-0 select-none items-center justify-center rounded-md border bg-background shadow-sm">
-        <IconUser />
+      <div className="flex size-[28px] shrink-0 select-none items-center justify-center rounded-full border bg-background p-1">
+        <UserRound />
       </div>
-      <div className="ml-4 flex-1 space-y-2 overflow-hidden pl-2">
-        {children}
-      </div>
+      <div className="ml-4 flex-1 space-y-2 overflow-hidden">{children}</div>
     </div>
   )
 }
@@ -36,8 +35,8 @@ export function BotMessage({
 
   return (
     <div className={cn('group relative flex items-start md:-ml-12', className)}>
-      <div className="flex size-[24px] shrink-0 select-none items-center justify-center rounded-md border bg-primary text-primary-foreground shadow-sm">
-        <IconOpenAI />
+      <div className="flex size-[28px] shrink-0 select-none items-center justify-center rounded-full border p-1">
+        <BrainCog />
       </div>
       <div className="ml-4 flex-1 space-y-2 overflow-hidden px-1">
         <MemoizedReactMarkdown
