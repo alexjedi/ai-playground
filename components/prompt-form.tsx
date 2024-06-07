@@ -17,7 +17,7 @@ import {
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit'
 import { nanoid } from 'nanoid'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, Mic, Mic2, Paperclip, Voicemail } from 'lucide-react'
+import { ArrowUp, Mic, Paperclip, Trash2 } from 'lucide-react'
 
 export function PromptForm({
   input,
@@ -31,12 +31,24 @@ export function PromptForm({
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const { submitUserMessage } = useActions()
   const [_, setMessages] = useUIState<typeof AI>()
+  const [uploadedFile, setUploadedFile] = React.useState<File | null>(null)
 
   React.useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus()
     }
   }, [])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setUploadedFile(file)
+    }
+  }
+
+  const handleRemoveFile = () => {
+    setUploadedFile(null)
+  }
 
   return (
     <form
@@ -51,7 +63,7 @@ export function PromptForm({
 
         const value = input.trim()
         setInput('')
-        if (!value) return
+        if (!value && !uploadedFile) return
 
         // Optimistically add user message UI
         setMessages(currentMessages => [
@@ -62,24 +74,52 @@ export function PromptForm({
           }
         ])
 
+        // Create form data
+        const formData = new FormData()
+        formData.append('message', value)
+        if (uploadedFile) {
+          formData.append('file', uploadedFile)
+        }
+
         // Submit and get response message
-        const responseMessage = await submitUserMessage(value)
+        const responseMessage = await submitUserMessage(formData)
         setMessages(currentMessages => [...currentMessages, responseMessage])
+        setUploadedFile(null)
       }}
     >
+      {uploadedFile && (
+        <div className="relative mb-2 px-8">
+          <img
+            src={URL.createObjectURL(uploadedFile)}
+            alt="Uploaded file"
+            className="w-8 h-auto rounded-md"
+          />
+          <button
+            type="button"
+            className="absolute -top-4 left-14 text-foreground rounded-full p-1"
+            onClick={handleRemoveFile}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )}
       <div className="relative flex max-h-60 w-full grow flex-col overflow-hidden bg-background px-8 border rounded-full sm:px-12">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute left-0 top-[13px] rounded-full bg-background p-0 sm:left-4"
-            >
-              <Paperclip size={20} className="text-muted-foreground" />
-              <span className="sr-only">New Chat</span>
-            </Button>
+            <div className="absolute top-[13px] left-[12px] rounded-full bg-background p-0 size-9 hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors">
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Paperclip size={20} className="text-muted-foreground" />
+                <span className="sr-only">Upload a file</span>
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </label>
+            </div>
           </TooltipTrigger>
-          <TooltipContent>New Chat</TooltipContent>
+          <TooltipContent>Upload a file</TooltipContent>
         </Tooltip>
         <Textarea
           ref={inputRef}

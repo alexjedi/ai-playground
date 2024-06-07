@@ -14,7 +14,7 @@ import { UserMenu } from '@/components/user-menu'
 import { SidebarMobile } from './sidebar-mobile'
 import { SidebarToggle } from './sidebar-toggle'
 import { ChatHistory } from './chat-history'
-import { Session } from '@/lib/types'
+import { Chat, Session } from '@/lib/types'
 import { ThemeToggle } from './theme-toggle'
 import { cache } from 'react'
 import { getChats } from '@/app/actions'
@@ -26,13 +26,19 @@ const loadChats = cache(async (userId?: string) => {
 
 async function UserOrLogin() {
   const session = (await auth()) as Session
-  const chats = await loadChats(session.user.id)
+  let chats: Chat[] = []
+  if (session?.user?.id) {
+    chats = await loadChats(session.user.id)
+  }
   return (
     <>
       <>
-        <SidebarMobile>
-          <ChatHistory userId={session.user.id} />
-        </SidebarMobile>
+        {session && (
+          <SidebarMobile>
+            <ChatHistory userId={session.user.id} />
+          </SidebarMobile>
+        )}
+
         <SidebarToggle type="chats" />
       </>
       <div className="flex items-center ml-auto">

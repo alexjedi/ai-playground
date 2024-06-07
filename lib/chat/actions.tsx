@@ -10,21 +10,8 @@ import {
 } from 'ai/rsc'
 import { openai } from '@ai-sdk/openai'
 
-import {
-  spinner,
-  BotCard,
-  BotMessage,
-  SystemMessage,
-  Stock,
-  Purchase
-} from '@/components/stocks'
+import { BotMessage } from '@/components/stocks'
 
-import { z } from 'zod'
-import { EventsSkeleton } from '@/components/stocks/events-skeleton'
-import { Events } from '@/components/stocks/events'
-import { StocksSkeleton } from '@/components/stocks/stocks-skeleton'
-import { Stocks } from '@/components/stocks/stocks'
-import { StockSkeleton } from '@/components/stocks/stock-skeleton'
 import {
   formatNumber,
   runAsyncFnWithoutBlocking,
@@ -36,80 +23,21 @@ import { SpinnerMessage, UserMessage } from '@/components/stocks/message'
 import { Chat, Message } from '@/lib/types'
 import { auth } from '@/auth'
 
-async function confirmPurchase(symbol: string, price: number, amount: number) {
+const model = openai('gpt-4o')
+const maxTokens = 150
+const temperature = 0.5
+const topP = 1
+const presencePenalty = 0
+const frequencyPenalty = 0
+
+async function submitUserMessage(formData: FormData) {
   'use server'
 
   const aiState = getMutableAIState<typeof AI>()
 
-  const purchasing = createStreamableUI(
-    <div className="inline-flex items-start gap-1 md:items-center">
-      {spinner}
-      <p className="mb-2">
-        Purchasing {amount} ${symbol}...
-      </p>
-    </div>
-  )
-
-  const systemMessage = createStreamableUI(null)
-
-  runAsyncFnWithoutBlocking(async () => {
-    await sleep(1000)
-
-    purchasing.update(
-      <div className="inline-flex items-start gap-1 md:items-center">
-        {spinner}
-        <p className="mb-2">
-          Purchasing {amount} ${symbol}... working on it...
-        </p>
-      </div>
-    )
-
-    await sleep(1000)
-
-    purchasing.done(
-      <div>
-        <p className="mb-2">
-          You have successfully purchased {amount} ${symbol}. Total cost:{' '}
-          {formatNumber(amount * price)}
-        </p>
-      </div>
-    )
-
-    systemMessage.done(
-      <SystemMessage>
-        You have purchased {amount} shares of {symbol} at ${price}. Total cost ={' '}
-        {formatNumber(amount * price)}.
-      </SystemMessage>
-    )
-
-    aiState.done({
-      ...aiState.get(),
-      messages: [
-        ...aiState.get().messages,
-        {
-          id: nanoid(),
-          role: 'system',
-          content: `[User has purchased ${amount} shares of ${symbol} at ${price}. Total cost = ${
-            amount * price
-          }]`
-        }
-      ]
-    })
-  })
-
-  return {
-    purchasingUI: purchasing.value,
-    newMessage: {
-      id: nanoid(),
-      display: systemMessage.value
-    }
-  }
-}
-
-async function submitUserMessage(content: string) {
-  'use server'
-
-  const aiState = getMutableAIState<typeof AI>()
+  const messageContent = formData.get('message') as string
+  const uploadedFile = formData.get('file') as File | null
+  const content = formData.get('content') as string
 
   aiState.update({
     ...aiState.get(),
@@ -118,7 +46,7 @@ async function submitUserMessage(content: string) {
       {
         id: nanoid(),
         role: 'user',
-        content
+        content: messageContent
       }
     ]
   })
@@ -127,9 +55,9 @@ async function submitUserMessage(content: string) {
   let textNode: undefined | React.ReactNode
 
   const result = await streamUI({
-    model: openai('gpt-4o'),
+    model: model,
     initial: <SpinnerMessage />,
-    system: ``,
+    system: content,
     messages: [
       ...aiState.get().messages.map((message: any) => ({
         role: message.role,
@@ -137,6 +65,11 @@ async function submitUserMessage(content: string) {
         name: message.name
       }))
     ],
+    maxTokens,
+    temperature,
+    topP,
+    presencePenalty,
+    frequencyPenalty,
     text: ({ content, done, delta }) => {
       if (!textStream) {
         textStream = createStreamableValue('')
@@ -182,8 +115,7 @@ export type UIState = {
 
 export const AI = createAI<AIState, UIState>({
   actions: {
-    submitUserMessage,
-    confirmPurchase
+    submitUserMessage
   },
   initialUIState: [],
   initialAIState: { chatId: nanoid(), messages: [] },
@@ -215,8 +147,11 @@ export const AI = createAI<AIState, UIState>({
       const userId = session.user.id as string
       const path = `/chat/${chatId}`
 
-      const firstMessageContent = messages[0].content as string
-      const title = firstMessageContent.substring(0, 100)
+      const firstMessageContent = messages[0].content
+      const title =
+        typeof firstMessageContent === 'string'
+          ? firstMessageContent.substring(0, 100)
+          : 'Chat'
 
       const chat: Chat = {
         id: chatId,
@@ -241,7 +176,9 @@ export const getUIStateFromAIState = (aiState: Chat) => {
       id: `${aiState.chatId}-${index}`,
       display:
         message.role === 'user' ? (
-          <UserMessage>{message.content as string}</UserMessage>
+          <UserMessage>
+            {typeof message.content === 'string' ? message.content : ''}
+          </UserMessage>
         ) : message.role === 'assistant' &&
           typeof message.content === 'string' ? (
           <BotMessage content={message.content} />

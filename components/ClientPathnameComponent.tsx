@@ -16,7 +16,9 @@ const ClientPathnameComponent = ({ chats }: { chats: Chat[] }) => {
 
   return (
     <>
-      <span className="text-muted-foreground">{activeChatName}</span>
+      <span className="text-muted-foreground text-sm text-ellipsis max-w-60 overflow-hidden text-nowrap">
+        {activeChatName}
+      </span>
       <Button variant="ghost" asChild className="size-9 p-0 lg:flex">
         <Link href="/" rel="nofollow">
           <PlusCircle className="size-5 text-muted-foreground" />
