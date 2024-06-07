@@ -17,7 +17,7 @@ import {
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit'
 import { nanoid } from 'nanoid'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, Mic, Paperclip, Trash2 } from 'lucide-react'
+import { ArrowUp, Mic, Paperclip, Square, Trash2 } from 'lucide-react'
 
 export function PromptForm({
   input,
@@ -29,9 +29,12 @@ export function PromptForm({
   const router = useRouter()
   const { formRef, onKeyDown } = useEnterSubmit()
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
-  const { submitUserMessage } = useActions()
+  const { submitUserMessage, abortRequest } = useActions()
   const [_, setMessages] = useUIState<typeof AI>()
   const [uploadedFile, setUploadedFile] = React.useState<File | null>(null)
+  const [currentRequestId, setCurrentRequestId] = React.useState<string | null>(
+    null
+  )
 
   React.useEffect(() => {
     if (inputRef.current) {
@@ -48,6 +51,13 @@ export function PromptForm({
 
   const handleRemoveFile = () => {
     setUploadedFile(null)
+  }
+
+  const handleStopClick = () => {
+    if (currentRequestId) {
+      abortRequest(currentRequestId)
+      setCurrentRequestId(null)
+    }
   }
 
   return (
@@ -81,10 +91,15 @@ export function PromptForm({
           formData.append('file', uploadedFile)
         }
 
+        // Create a new request ID
+        const requestId = nanoid()
+        setCurrentRequestId(requestId)
+
         // Submit and get response message
-        const responseMessage = await submitUserMessage(formData)
+        const responseMessage = await submitUserMessage(formData, requestId)
         setMessages(currentMessages => [...currentMessages, responseMessage])
         setUploadedFile(null)
+        setCurrentRequestId(null)
       }}
     >
       {uploadedFile && (
@@ -136,7 +151,17 @@ export function PromptForm({
           value={input}
           onChange={e => setInput(e.target.value)}
         />
-        <div className="absolute right-0 top-[13px] sm:right-4">
+        <div className="absolute right-0 top-[13px] sm:right-4 flex items-center">
+          {currentRequestId && (
+            <Button
+              onClick={handleStopClick}
+              size="icon"
+              className="rounded-full mr-2"
+            >
+              <Square size={20} className="right-1 top-1" />
+              <span className="sr-only">Stop generation</span>
+            </Button>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               {input === '' ? (

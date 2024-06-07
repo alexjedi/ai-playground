@@ -24,13 +24,15 @@ import { Chat, Message } from '@/lib/types'
 import { auth } from '@/auth'
 
 const model = openai('gpt-4o')
-const maxTokens = 150
+const maxTokens = 450
 const temperature = 0.5
 const topP = 1
 const presencePenalty = 0
 const frequencyPenalty = 0
 
-async function submitUserMessage(formData: FormData) {
+const activeControllers = new Map<string, AbortController>()
+
+async function submitUserMessage(formData: FormData, requestId: string) {
   'use server'
 
   const aiState = getMutableAIState<typeof AI>()
@@ -38,6 +40,9 @@ async function submitUserMessage(formData: FormData) {
   const messageContent = formData.get('message') as string
   const uploadedFile = formData.get('file') as File | null
   const content = formData.get('content') as string
+
+  const controller = new AbortController()
+  activeControllers.set(requestId, controller)
 
   aiState.update({
     ...aiState.get(),
@@ -54,52 +59,65 @@ async function submitUserMessage(formData: FormData) {
   let textStream: undefined | ReturnType<typeof createStreamableValue<string>>
   let textNode: undefined | React.ReactNode
 
-  const result = await streamUI({
-    model: model,
-    initial: <SpinnerMessage />,
-    system: content,
-    messages: [
-      ...aiState.get().messages.map((message: any) => ({
-        role: message.role,
-        content: message.content,
-        name: message.name
-      }))
-    ],
-    maxTokens,
-    temperature,
-    topP,
-    presencePenalty,
-    frequencyPenalty,
-    text: ({ content, done, delta }) => {
-      if (!textStream) {
-        textStream = createStreamableValue('')
-        textNode = <BotMessage content={textStream.value} />
-      }
+  try {
+    const result = await streamUI({
+      model: model,
+      initial: <SpinnerMessage />,
+      system: content,
+      messages: [
+        ...aiState.get().messages.map((message: any) => ({
+          role: message.role,
+          content: message.content,
+          name: message.name
+        }))
+      ],
+      maxTokens,
+      temperature,
+      topP,
+      presencePenalty,
+      frequencyPenalty,
+      text: ({ content, done, delta }) => {
+        if (!textStream) {
+          textStream = createStreamableValue('')
+          textNode = <BotMessage content={textStream.value} />
+        }
 
-      if (done) {
-        textStream.done()
-        aiState.done({
-          ...aiState.get(),
-          messages: [
-            ...aiState.get().messages,
-            {
-              id: nanoid(),
-              role: 'assistant',
-              content
-            }
-          ]
-        })
-      } else {
-        textStream.update(delta)
-      }
+        if (done) {
+          textStream.done()
+          aiState.done({
+            ...aiState.get(),
+            messages: [
+              ...aiState.get().messages,
+              {
+                id: nanoid(),
+                role: 'assistant',
+                content
+              }
+            ]
+          })
+        } else {
+          textStream.update(delta)
+        }
 
-      return textNode
+        return textNode
+      },
+      abortSignal: controller.signal
+    })
+
+    return {
+      id: nanoid(),
+      display: result.value
     }
-  })
+  } finally {
+    activeControllers.delete(requestId)
+  }
+}
 
-  return {
-    id: nanoid(),
-    display: result.value
+export function abortRequest(requestId: string) {
+  const controller = activeControllers.get(requestId)
+  if (controller) {
+    controller.abort()
+    activeControllers.delete(requestId)
   }
 }
 
